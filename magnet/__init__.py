@@ -19,7 +19,8 @@ def fit_transform(
     init=None,
     sparse=True,
     epochs=10,
-    batch_size=100
+    batch_size=100,
+    n_jobs=8
 ):
     """
     Transforms a graph into a numpy matrix containing embedding of vertices,
@@ -43,13 +44,14 @@ def fit_transform(
     :param sparse: Controls sparsity of the graph adjacency matrix
     :param epochs: Number of epochs
     :param batch_size: Size of the batch of the SGD
+    :param n_jobs: Number of processes building randomwalks
     """
 
     from .model import fit_model
     X, Y = create_random_walks(
         G,
         num_walks=num_walks, walk_len=walk_len,
-        p=p, q=q, sparse=sparse)
+        p=p, q=q, sparse=sparse,n_jobs=n_jobs)
 
     if label_smoothing:
         Y = np.clip(Y, 0.0001, 0.99)
@@ -83,17 +85,17 @@ def create_random_walks(
     num_nodes = len(G.nodes)
     id2node = list(G.nodes)
     node2id = {k:v for v, k in enumerate(id2node)}
-    neighbors = {node: list(G.neighbors(node)) for node in node2id}
+    neighbors = {node2id[node]: 
+        [node2id[target] for target in G.neighbors(node)]
+        for node in node2id}
 
     if n_jobs == 1:
         walks = one_job_walks(num_walks, walk_len, 
-                              neighbors, id2node, node2id,
-                              num_nodes, p, q)
+                              neighbors, num_nodes, p, q)
     else:
         walks = parallel_walks(n_jobs,
                                num_walks, walk_len,
-                               neighbors, id2node, node2id,
-                               num_nodes, p, q)
+                               neighbors, num_nodes, p, q)
 
     if not sparse:
         Adj = nx.adjacency_matrix(G).astype(np.float16).todense()
@@ -110,11 +112,11 @@ def create_random_walks(
     return (walks, similarity)
 
 
-def process_walks(queue, results, walk_len, neighbors, id2node, node2id, num_nodes, p, q, dtype=np.uint32):
+def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, dtype=np.uint32):
     """Unit function for a multiprocessing instance."""
     while True:
         queue.get()
-        steps = generate_walk(walk_len, neighbors, id2node, node2id, num_nodes, p, q)
+        steps = generate_walk(walk_len, neighbors, num_nodes, p, q)
         results.put(np.array(steps, dtype=dtype).T)
         queue.task_done()
 
@@ -124,8 +126,6 @@ def parallel_walks(
     num_walks,
     walk_len,
     neighbors,
-    id2node,
-    node2id,
     num_nodes,
     p, q
 ):
@@ -137,8 +137,7 @@ def parallel_walks(
 
     for i in range(n_jobs):
         args = (queue, results, walk_len,
-                neighbors, id2node, node2id,
-                num_nodes, p, q)
+                neighbors, num_nodes, p, q)
         thread = Process(target=process_walks, args=args)
         thread.daemon = True
         thread.start()
@@ -165,8 +164,6 @@ def one_job_walks(
     num_walks,
     walk_len,
     neighbors,
-    id2node,
-    node2id,
     num_nodes,
     p, q,
     dtype=np.uint32

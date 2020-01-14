@@ -8,7 +8,7 @@ import random
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef random_step(dict neighbors, list last_step, list id2node, dict node2id, int num_nodes, float p=.1, float q=.1):
+cpdef random_step(dict neighbors, list last_step, int num_nodes, float p=.1, float q=.1):
     cdef list nn
     cdef list step = []
     cdef int j
@@ -20,22 +20,20 @@ cpdef random_step(dict neighbors, list last_step, list id2node, dict node2id, in
         elif rand <= p + q:
             next_node = j
         else:
-            nn = neighbors[id2node[node]]
-            next_node = node2id[random.choice(nn)]
+            nn = neighbors[node]
+            next_node = random.choice(nn)
         step.append(next_node)
     return step
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef generate_walk(int walk_len, dict neighbors, list id2node, dict node2id, int num_nodes, float p=.1, float q=.1):
+cpdef generate_walk(int walk_len, dict neighbors, int num_nodes, float p=.1, float q=.1):
     cdef list steps = [list(range(num_nodes))]
     cdef int i
     for i in range(walk_len - 1):
         step = random_step(neighbors,
                            steps[i],
-                           id2node,
-                           node2id,
                            num_nodes,
                            p, q)
         steps.append(step)

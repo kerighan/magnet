@@ -11,7 +11,7 @@ def fit_model(
     size=2,
     kernel='power',
     epochs=50, batch_size=100,
-    optimizer='nadam'
+    optimizer='rmsprop'
 ):
     inp = Input(shape=(X.shape[1],))
     if Z is not None:
