@@ -11,7 +11,7 @@ import random
 cpdef random_step(dict neighbors, list last_step, list id2node, dict node2id, int num_nodes, float p=.1, float q=.1):
     cdef list nn
     cdef list step = []
-    cdef int i
+    cdef int j
     for j in range(num_nodes):
         node = last_step[j]
         rand = random.random()
@@ -33,7 +33,7 @@ cpdef generate_walk(int walk_len, dict neighbors, list id2node, dict node2id, in
     cdef int i
     for i in range(walk_len - 1):
         step = random_step(neighbors,
-                           steps[-1],
+                           steps[i],
                            id2node,
                            node2id,
                            num_nodes,

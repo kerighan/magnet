@@ -58,7 +58,7 @@ def fit_transform(
 
     if init == 'spectral':
         Z = spectral_embedding(G, size)
-    elif isinstance(Z, np.ndarray):
+    elif isinstance(init, np.ndarray):
         Z = init
     else:
         Z = None
@@ -148,6 +148,8 @@ def parallel_walks(
         while 1:
             if q.qsize() > 0:
                 ls.append(q.get())
+            else:
+                break
         return ls
 
     walks = np.vstack(dump_queue(results))
