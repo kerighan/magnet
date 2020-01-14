@@ -19,8 +19,7 @@ def fit_transform(
     init=None,
     sparse=True,
     epochs=10,
-    batch_size=100,
-    batch_normalization=True
+    batch_size=100
 ):
     """
     Transforms a graph into a numpy matrix containing embedding of vertices,
@@ -44,7 +43,6 @@ def fit_transform(
     :param sparse: Controls sparsity of the graph adjacency matrix
     :param epochs: Number of epochs
     :param batch_size: Size of the batch of the SGD
-    :param batch_normalization: Boolean. Adds a BatchNormalization layer
     """
 
     from .model import fit_model
@@ -67,8 +65,8 @@ def fit_transform(
         a=a, b=b,
         size=size,
         kernel=kernel,
-        epochs=epochs, batch_size=batch_size,
-        batch_normalization=batch_normalization)
+        epochs=epochs,
+        batch_size=batch_size)
     return embeddings
 
 

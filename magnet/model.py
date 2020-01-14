@@ -10,7 +10,6 @@ def fit_model(
     a=1, b=0.5,
     size=2,
     kernel='power',
-    batch_normalization=True,
     epochs=50, batch_size=100,
     optimizer='adadelta'
 ):
@@ -19,11 +18,7 @@ def fit_model(
         embedding = Embedding(num_nodes, size, weights=[Z])(inp)
     else:
         embedding = Embedding(num_nodes, size)(inp)
-    if batch_normalization:
-        batch_norm = BatchNormalization()(embedding)
-        distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(batch_norm)
-    else:
-        distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(embedding)
+    distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(embedding)
     model = Model(inp, distance)
     model.compile(optimizer, 'mse')
     for i in tqdm(range(epochs), 'epochs'):
