@@ -8,7 +8,7 @@ import numpy as np, time
 def fit_transform(
     G,
     size=2,
-    num_walks=50,
+    num_walks=25,
     walk_len=50,
     a=1,
     b=0.5,
@@ -46,10 +46,10 @@ def fit_transform(
     """
 
     from .model import fit_model
-    X, Y = create_random_walks(G,
-      num_walks=num_walks, walk_len=walk_len, p=p,
-      q=q,
-      sparse=sparse)
+    X, Y = create_random_walks(
+        G,
+        num_walks=num_walks, walk_len=walk_len,
+        p=p, q=q, sparse=sparse)
 
     if label_smoothing:
         Y = np.clip(Y, 0.0001, 0.99)
@@ -83,12 +83,17 @@ def create_random_walks(
     num_nodes = len(G.nodes)
     id2node = list(G.nodes)
     node2id = {k:v for v, k in enumerate(id2node)}
-    neighbors = {node:list(G.neighbors(node)) for node in id2node}
+    neighbors = {node: list(G.neighbors(node)) for node in node2id}
 
     if n_jobs == 1:
-        walks = one_job_walks(num_walks, walk_len, neighbors, id2node, node2id, num_nodes, p, q)
+        walks = one_job_walks(num_walks, walk_len, 
+                              neighbors, id2node, node2id,
+                              num_nodes, p, q)
     else:
-        walks = parallel_walks(n_jobs, num_walks, walk_len, neighbors, id2node, node2id, num_nodes, p, q)
+        walks = parallel_walks(n_jobs,
+                               num_walks, walk_len,
+                               neighbors, id2node, node2id,
+                               num_nodes, p, q)
 
     if not sparse:
         Adj = nx.adjacency_matrix(G).astype(np.float16).todense()

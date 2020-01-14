@@ -63,7 +63,7 @@ cpdef compute_similarity(np.ndarray walks, np.ndarray Adj, int walk_len):
         for j in range(walks_length):
             x_tuple.append(j)
             y_tuple.append(i)
-    
+
     similarity[x_tuple, y_tuple] = Adj[a_tuple, b_tuple]
     return similarity
 

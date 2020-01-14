@@ -11,14 +11,16 @@ def fit_model(
     size=2,
     kernel='power',
     epochs=50, batch_size=100,
-    optimizer='adadelta'
+    optimizer='nadam'
 ):
     inp = Input(shape=(X.shape[1],))
     if Z is not None:
         embedding = Embedding(num_nodes, size, weights=[Z])(inp)
     else:
         embedding = Embedding(num_nodes, size)(inp)
-    distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(embedding)
+    batchn = BatchNormalization()(embedding)
+    distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(batchn)
+
     model = Model(inp, distance)
     model.compile(optimizer, 'mse')
     for i in tqdm(range(epochs), 'epochs'):
@@ -39,7 +41,7 @@ class DistanceSum(Layer):
             self.kernel = 1
         else:
             self.kernel = 2
-        (super(DistanceSum, self).__init__)(**kwargs)
+        super(DistanceSum, self).__init__(**kwargs)
 
     def build(self, input_shape):
         super(DistanceSum, self).build(input_shape)
@@ -57,8 +59,7 @@ class DistanceSum(Layer):
             return sim_g * sim_p
 
     def compute_output_shape(self, input_shape):
-        return (
-         input_shape[0], input_shape[1] - 1)
+        return (input_shape[0], input_shape[1] - 1)
 
 
 def graph_to_vec(G):
