@@ -1,4 +1,4 @@
-from .cutils import random_step, generate_walk, compute_similarity, compute_sparse_similarity
+from .cutils import random_step, generate_walk, compute_similarity, compute_sparse_similarity, compute_graph_similarity
 from multiprocessing import JoinableQueue, Process, Queue
 import networkx as nx
 from tqdm import tqdm
@@ -62,6 +62,8 @@ def fit_transform(
         Z = init
     else:
         Z = None
+    
+    print(f"{len(X)} samples")
     embeddings = fit_model(
         X, Y, Z, (len(G.nodes)),
         a=a, b=b,
@@ -93,9 +95,9 @@ def create_random_walks(
         walks = one_job_walks(num_walks, walk_len, 
                               neighbors, num_nodes, p, q)
     else:
-        walks = parallel_walks(n_jobs,
-                               num_walks, walk_len,
-                               neighbors, num_nodes, p, q)
+        walks = parallel_walks(num_walks, walk_len,
+                               neighbors, num_nodes, p, q,
+                               n_jobs)
 
     if not sparse:
         Adj = nx.adjacency_matrix(G).astype(np.float16).todense()
@@ -104,12 +106,38 @@ def create_random_walks(
         elapsed_time = time.time() - start_time
         print(f"similarities computed - T={elapsed_time:.2f}s")
     else:
-        Adj = nx.adjacency_matrix(G)
+        # Adj = nx.adjacency_matrix(G)
+        # start_time = time.time()
+        # similarity = compute_sparse_similarity(walks, Adj, walk_len)
+        # elapsed_time = time.time() - start_time
         start_time = time.time()
-        similarity = compute_sparse_similarity(walks, Adj, walk_len)
+        weights = compute_weights(G, node2id)
+
+        similarity = compute_graph_similarity(walks, weights, walk_len)
         elapsed_time = time.time() - start_time
         print(f"similarities computed - T={elapsed_time:.2f}s")
+
     return (walks, similarity)
+
+
+def compute_weights(G, node2id):
+    is_not_directed = not nx.is_directed(G)
+    is_weighted = nx.is_weighted(G)
+
+    weights = {}
+    for a, b in G.edges:
+        node_a = str(node2id[a])
+        node_b = str(node2id[b])
+
+        if is_weighted:
+            weight = G[a][b]["weight"]
+        else:
+            weight = 1
+
+        weights[node_a + "_" + node_b] = weight
+        if is_not_directed:
+            weights[node_b + "_" + node_a] = weight
+    return weights
 
 
 def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, dtype=np.uint32):
@@ -122,12 +150,12 @@ def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, dtype=np
 
 
 def parallel_walks(
-    n_jobs,
     num_walks,
     walk_len,
     neighbors,
     num_nodes,
-    p, q
+    p, q,
+    n_jobs
 ):
     start_time = time.time()
     results = Queue()

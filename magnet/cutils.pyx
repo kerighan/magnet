@@ -21,7 +21,10 @@ cpdef random_step(dict neighbors, list last_step, int num_nodes, float p=.1, flo
             next_node = j
         else:
             nn = neighbors[node]
-            next_node = random.choice(nn)
+            if len(nn) == 0:
+                next_node = random.randint(0, num_nodes - 1)
+            else:
+                next_node = random.choice(nn)
         step.append(next_node)
     return step
 
@@ -141,3 +144,38 @@ cpdef weighted_edges_from_neighbors(np.ndarray neighbors, int N, np.ndarray dist
                     value = (threshold - value) / threshold
                     edges.append((i, neighbor, value))
     return edges
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef compute_graph_similarity(np.ndarray walks, weights, int walk_len):
+    import networkx as nx
+    cdef int walks_length = len(walks)
+    cdef np.ndarray similarity = np.zeros(
+        (walks.shape[0], walks.shape[1] - 1),
+        dtype=np.float16)
+
+    cdef Py_ssize_t i
+    cdef Py_ssize_t j
+
+    cdef list x_tuple = []
+    cdef list y_tuple = []
+    cdef list a_tuple = []
+    cdef list b_tuple = []
+    cdef list values = []
+
+    for i in range(walk_len - 1):
+        # a_tuple += list(walks[:, i])
+        # b_tuple += list(walks[:, i + 1])
+        for j in range(walks_length):
+            x_tuple.append(j)
+            y_tuple.append(i)
+            node_a = str(walks[j, i])
+            node_b = str(walks[j, i + 1])
+            try:
+                values.append(weights[node_a + "_" + node_b])
+            except KeyError:
+                values.append(0)
+    
+    similarity[x_tuple, y_tuple] = values
+    return similarity
