@@ -4,6 +4,9 @@ import networkx as nx
 from tqdm import tqdm
 import numpy as np, time
 
+# ----------------------------------------------
+# Manifold learning and dimensionality reduction
+# ----------------------------------------------
 
 def fit_transform(
     G,
@@ -74,6 +77,46 @@ def fit_transform(
     return embeddings
 
 
+def project(
+    X,
+    size=2,
+    n_neighbors=10,
+    threshold=.3,
+    metric="euclidean",
+    weighted=True,
+    num_walks=25,
+    walk_len=40,
+    a=1, b=0.3,
+    p=0.1, q=0.1,
+    kernel='power',
+    label_smoothing=True,
+    init=None,
+    sparse=True,
+    epochs=5,
+    batch_size=200,
+    n_jobs=4
+):
+    G = knn_graph(X, k=n_neighbors, metric=metric, threshold=threshold, weighted=weighted)
+    return fit_transform(
+        G,
+        size,
+        num_walks,
+        walk_len,
+        a, b,
+        p, q,
+        kernel,
+        label_smoothing,
+        init,
+        sparse,
+        epochs,
+        batch_size,
+        n_jobs)
+
+
+# ------------
+# Random walks
+# ------------
+
 def create_random_walks(
     G,
     num_walks=25, walk_len=100,
@@ -100,46 +143,7 @@ def create_random_walks(
             neighbors, num_nodes, p, q,
             n_jobs)
 
-    # if not sparse:
-    #     Adj = nx.adjacency_matrix(G).astype(np.float16).todense()
-    #     start_time = time.time()
-    #     similarity = compute_similarity(walks, Adj, walk_len)
-    #     elapsed_time = time.time() - start_time
-    #     print(f"similarities computed - T={elapsed_time:.2f}s")
-    # else:
-    #     # Adj = nx.adjacency_matrix(G)
-    #     # start_time = time.time()
-    #     # similarity = compute_sparse_similarity(walks, Adj, walk_len)
-    #     # elapsed_time = time.time() - start_time
-    #     start_time = time.time()
-    #     weights = compute_weights(G, node2id)
-
-    #     similarity = compute_graph_similarity(walks, weights, walk_len)
-    #     elapsed_time = time.time() - start_time
-    #     print(f"similarities computed - T={elapsed_time:.2f}s")
-
     return (walks, similarity)
-
-
-def compute_weights(G, node2id):
-    start_time = time.time()
-    is_weighted = nx.is_weighted(G)
-
-    weights = {}
-    for a, b in G.edges:
-        node_a = str(node2id[a])
-        node_b = str(node2id[b])
-
-        if is_weighted:
-            weight = G[a][b]["weight"]
-        else:
-            weight = 1
-
-        weights[node_a + "_" + node_b] = weight
-
-    elapsed_time = time.time() - start_time
-    print(f"weights loaded - T={elapsed_time:.2f}s")
-    return weights
 
 
 def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, weights, is_directed, dtype=np.uint32):
@@ -217,6 +221,31 @@ def one_job_walks(
     walks = np.vstack(walks)
     return walks
 
+
+def compute_weights(G, node2id):
+    start_time = time.time()
+    is_weighted = nx.is_weighted(G)
+
+    weights = {}
+    for a, b in G.edges:
+        node_a = str(node2id[a])
+        node_b = str(node2id[b])
+
+        if is_weighted:
+            weight = G[a][b]["weight"]
+        else:
+            weight = 1
+
+        weights[node_a + "_" + node_b] = weight
+
+    elapsed_time = time.time() - start_time
+    print(f"weights loaded - T={elapsed_time:.2f}s")
+    return weights
+
+
+# -----
+# Utils
+# -----
 
 def knn_graph(X, k=10, metric='euclidean', threshold=None, weighted=True):
     """
