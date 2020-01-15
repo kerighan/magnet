@@ -18,9 +18,9 @@ def fit_transform(
     label_smoothing=True,
     init=None,
     sparse=True,
-    epochs=10,
+    epochs=5,
     batch_size=100,
-    n_jobs=8
+    n_jobs=4
 ):
     """
     Transforms a graph into a numpy matrix containing embedding of vertices,
@@ -95,33 +95,34 @@ def create_random_walks(
         walks = one_job_walks(num_walks, walk_len, 
                               neighbors, num_nodes, p, q)
     else:
-        walks = parallel_walks(num_walks, walk_len,
-                               neighbors, num_nodes, p, q,
-                               n_jobs)
+        walks, similarity = parallel_walks(
+            G, node2id, num_walks, walk_len,
+            neighbors, num_nodes, p, q,
+            n_jobs)
 
-    if not sparse:
-        Adj = nx.adjacency_matrix(G).astype(np.float16).todense()
-        start_time = time.time()
-        similarity = compute_similarity(walks, Adj, walk_len)
-        elapsed_time = time.time() - start_time
-        print(f"similarities computed - T={elapsed_time:.2f}s")
-    else:
-        # Adj = nx.adjacency_matrix(G)
-        # start_time = time.time()
-        # similarity = compute_sparse_similarity(walks, Adj, walk_len)
-        # elapsed_time = time.time() - start_time
-        start_time = time.time()
-        weights = compute_weights(G, node2id)
+    # if not sparse:
+    #     Adj = nx.adjacency_matrix(G).astype(np.float16).todense()
+    #     start_time = time.time()
+    #     similarity = compute_similarity(walks, Adj, walk_len)
+    #     elapsed_time = time.time() - start_time
+    #     print(f"similarities computed - T={elapsed_time:.2f}s")
+    # else:
+    #     # Adj = nx.adjacency_matrix(G)
+    #     # start_time = time.time()
+    #     # similarity = compute_sparse_similarity(walks, Adj, walk_len)
+    #     # elapsed_time = time.time() - start_time
+    #     start_time = time.time()
+    #     weights = compute_weights(G, node2id)
 
-        similarity = compute_graph_similarity(walks, weights, walk_len)
-        elapsed_time = time.time() - start_time
-        print(f"similarities computed - T={elapsed_time:.2f}s")
+    #     similarity = compute_graph_similarity(walks, weights, walk_len)
+    #     elapsed_time = time.time() - start_time
+    #     print(f"similarities computed - T={elapsed_time:.2f}s")
 
     return (walks, similarity)
 
 
 def compute_weights(G, node2id):
-    is_not_directed = not nx.is_directed(G)
+    start_time = time.time()
     is_weighted = nx.is_weighted(G)
 
     weights = {}
@@ -135,21 +136,25 @@ def compute_weights(G, node2id):
             weight = 1
 
         weights[node_a + "_" + node_b] = weight
-        if is_not_directed:
-            weights[node_b + "_" + node_a] = weight
+
+    elapsed_time = time.time() - start_time
+    print(f"weights loaded - T={elapsed_time:.2f}s")
     return weights
 
 
-def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, dtype=np.uint32):
+def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, weights, is_directed, dtype=np.uint32):
     """Unit function for a multiprocessing instance."""
     while True:
         queue.get()
-        steps = generate_walk(walk_len, neighbors, num_nodes, p, q)
-        results.put(np.array(steps, dtype=dtype).T)
+        steps, sim = generate_walk(walk_len, neighbors, num_nodes, p, q, weights, is_directed)
+        results.put((
+            np.array(steps, dtype=dtype).T,
+            np.array(sim, dtype=np.float16).T))
         queue.task_done()
 
 
 def parallel_walks(
+    G, node2id,
     num_walks,
     walk_len,
     neighbors,
@@ -157,6 +162,9 @@ def parallel_walks(
     p, q,
     n_jobs
 ):
+    weights = compute_weights(G, node2id)
+    is_directed = nx.is_directed(G)
+
     start_time = time.time()
     results = Queue()
     queue = JoinableQueue()
@@ -165,7 +173,7 @@ def parallel_walks(
 
     for i in range(n_jobs):
         args = (queue, results, walk_len,
-                neighbors, num_nodes, p, q)
+                neighbors, num_nodes, p, q, weights, is_directed)
         thread = Process(target=process_walks, args=args)
         thread.daemon = True
         thread.start()
@@ -174,18 +182,23 @@ def parallel_walks(
 
     def dump_queue(q):
         """ Dump a Queue to a list """
-        ls = []
+        w = []
+        s = []
         while 1:
             if q.qsize() > 0:
-                ls.append(q.get())
+                walk, sim = q.get()
+                w.append(walk)
+                s.append(sim)
             else:
                 break
-        return ls
+        return w, s
 
-    walks = np.vstack(dump_queue(results))
+    walks, similarity = dump_queue(results)
+    walks = np.vstack(walks)
+    similarity = np.vstack(similarity)
     elapsed_time = time.time() - start_time
     print(f"random walks built - T={elapsed_time:.2f}s")
-    return walks
+    return walks, similarity
 
 
 def one_job_walks(
