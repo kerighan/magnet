@@ -2,11 +2,13 @@ from .cutils import random_step, generate_walk, compute_similarity, compute_spar
 from multiprocessing import JoinableQueue, Process, Queue
 import networkx as nx
 from tqdm import tqdm
-import numpy as np, time
+import numpy as np
+import time
 
 # ----------------------------------------------
 # Manifold learning and dimensionality reduction
 # ----------------------------------------------
+
 
 def fit_transform(
     G,
@@ -23,6 +25,7 @@ def fit_transform(
     sparse=True,
     epochs=5,
     batch_size=100,
+    optimizer="rmsprop",
     n_jobs=4
 ):
     """
@@ -54,7 +57,8 @@ def fit_transform(
     X, Y = create_random_walks(
         G,
         num_walks=num_walks, walk_len=walk_len,
-        p=p, q=q, sparse=sparse,n_jobs=n_jobs)
+        p=p, q=q, sparse=sparse, n_jobs=n_jobs,
+        optimizer=optimizer)
 
     if label_smoothing:
         Y = np.clip(Y, 1e-6, 0.99)
@@ -65,7 +69,7 @@ def fit_transform(
         Z = init
     else:
         Z = None
-    
+
     print(f"{len(X)} samples")
     embeddings = fit_model(
         X, Y, Z, (len(G.nodes)),
@@ -96,7 +100,8 @@ def project(
     batch_size=200,
     n_jobs=4
 ):
-    G = knn_graph(X, k=n_neighbors, metric=metric, threshold=threshold, weighted=weighted)
+    G = knn_graph(X, k=n_neighbors, metric=metric,
+                  threshold=threshold, weighted=weighted)
     return fit_transform(
         G,
         size,
@@ -129,10 +134,10 @@ def create_random_walks(
     """
     num_nodes = len(G.nodes)
     id2node = list(G.nodes)
-    node2id = {k:v for v, k in enumerate(id2node)}
-    neighbors = {node2id[node]: 
-        [node2id[target] for target in G.neighbors(node)]
-        for node in node2id}
+    node2id = {k: v for v, k in enumerate(id2node)}
+    neighbors = {node2id[node]:
+                 [node2id[target] for target in G.neighbors(node)]
+                 for node in node2id}
 
     if n_jobs == 1:
         walks = one_job_walks(num_walks, walk_len, num_nodes,
@@ -155,7 +160,8 @@ def process_walks(
     p, q,
     weights,
     is_directed,
-    dtype=np.uint32):
+    dtype=np.uint32
+):
     """Unit function for a multiprocessing instance."""
     while True:
         if queue.empty():
@@ -230,7 +236,7 @@ def one_job_walks(
 ):
     walks = []
     for i in tqdm(range(num_walks), 'random walks'):
-        steps = generate_walk(walk_len, neighbors, id2node, node2id, num_nodes, p, q)
+        steps = generate_walk(walk_len, neighbors, num_nodes, p, q)
         walks.append(np.array(steps, dtype=dtype).T)
 
     walks = np.vstack(walks)
