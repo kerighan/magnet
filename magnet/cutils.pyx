@@ -45,7 +45,7 @@ cpdef random_step(dict neighbors, list last_step, int num_nodes, float p=.1, flo
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef generate_walk(int walk_len, dict neighbors, int num_nodes, float p=.1, float q=.1, dict weights={}, int is_directed=False):
+cpdef generate_walk(int walk_len, int num_nodes, dict neighbors, float p=.1, float q=.1, dict weights={}, int is_directed=False):
     cdef list steps = [list(range(num_nodes))]
     cdef list similarity = []
     cdef int i

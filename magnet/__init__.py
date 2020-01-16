@@ -57,7 +57,7 @@ def fit_transform(
         p=p, q=q, sparse=sparse,n_jobs=n_jobs)
 
     if label_smoothing:
-        Y = np.clip(Y, 0.0001, 0.99)
+        Y = np.clip(Y, 1e-6, 0.99)
 
     if init == 'spectral':
         Z = spectral_embedding(G, size)
@@ -81,9 +81,9 @@ def project(
     X,
     size=2,
     n_neighbors=10,
-    threshold=.3,
     metric="euclidean",
-    weighted=True,
+    threshold=None,
+    weighted=False,
     num_walks=25,
     walk_len=40,
     a=1, b=0.3,
@@ -135,8 +135,8 @@ def create_random_walks(
         for node in node2id}
 
     if n_jobs == 1:
-        walks = one_job_walks(num_walks, walk_len, 
-                              neighbors, num_nodes, p, q)
+        walks = one_job_walks(num_walks, walk_len, num_nodes,
+                              neighbors, p, q)
     else:
         walks, similarity = parallel_walks(
             G, node2id, num_walks, walk_len,
@@ -146,11 +146,27 @@ def create_random_walks(
     return (walks, similarity)
 
 
-def process_walks(queue, results, walk_len, neighbors, num_nodes, p, q, weights, is_directed, dtype=np.uint32):
+def process_walks(
+    queue,
+    results,
+    walk_len,
+    num_nodes,
+    neighbors,
+    p, q,
+    weights,
+    is_directed,
+    dtype=np.uint32):
     """Unit function for a multiprocessing instance."""
     while True:
+        if queue.empty():
+            break
         queue.get()
-        steps, sim = generate_walk(walk_len, neighbors, num_nodes, p, q, weights, is_directed)
+        steps, sim = generate_walk(
+            walk_len, num_nodes,
+            neighbors,
+            p, q,
+            weights,
+            is_directed)
         results.put((
             np.array(steps, dtype=dtype).T,
             np.array(sim, dtype=np.float16).T))
@@ -176,8 +192,8 @@ def parallel_walks(
         queue.put(i)
 
     for i in range(n_jobs):
-        args = (queue, results, walk_len,
-                neighbors, num_nodes, p, q, weights, is_directed)
+        args = (queue, results, walk_len, num_nodes,
+                neighbors, p, q, weights, is_directed)
         thread = Process(target=process_walks, args=args)
         thread.daemon = True
         thread.start()
@@ -207,9 +223,8 @@ def parallel_walks(
 
 def one_job_walks(
     num_walks,
-    walk_len,
+    walk_len, num_nodes,
     neighbors,
-    num_nodes,
     p, q,
     dtype=np.uint32
 ):
