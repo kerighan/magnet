@@ -25,8 +25,8 @@ def fit_transform(
     sparse=True,
     epochs=5,
     batch_size=100,
-    optimizer="rmsprop",
-    n_jobs=4
+    n_jobs=4,
+    optimizer="adamax",
 ):
     """
     Transforms a graph into a numpy matrix containing embedding of vertices,
@@ -57,8 +57,7 @@ def fit_transform(
     X, Y = create_random_walks(
         G,
         num_walks=num_walks, walk_len=walk_len,
-        p=p, q=q, sparse=sparse, n_jobs=n_jobs,
-        optimizer=optimizer)
+        p=p, q=q, sparse=sparse, n_jobs=n_jobs)
 
     if label_smoothing:
         Y = np.clip(Y, 1e-6, 0.99)
@@ -77,7 +76,8 @@ def fit_transform(
         size=size,
         kernel=kernel,
         epochs=epochs,
-        batch_size=batch_size)
+        batch_size=batch_size,
+        optimizer=optimizer)
     return embeddings
 
 
@@ -123,8 +123,7 @@ def project(
 # ------------
 
 def create_random_walks(
-    G,
-    num_walks=25, walk_len=100,
+    G, num_walks=25, walk_len=100,
     p=0.1, q=0.1,
     n_jobs=8,
     sparse=True

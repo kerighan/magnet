@@ -1,6 +1,6 @@
 from keras.layers import Input, Embedding, Dense, BatchNormalization
 from keras.models import Model
-from .layers import DistanceSum, LearnDistanceSum
+from .layers import DistanceSum, LearnDistanceSum, LearnBDistanceSum
 from tqdm import tqdm
 
 
@@ -17,10 +17,12 @@ def fit_model(
     if Z is not None:
         embedding = Embedding(num_nodes, size, weights=[Z])(inp)
     else:
-        embedding = Embedding(num_nodes, size)(inp)
+        embedding = Embedding(num_nodes, size, embeddings_initializer="he_normal")(inp)
     batchn = BatchNormalization()(embedding)
-    if a is not None:
+    if a is not None and b is not None:
         distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(batchn)
+    elif b is None:
+        distance = LearnBDistanceSum((X.shape[1]), a=a, kernel=kernel)(batchn)
     else:
         distance = LearnDistanceSum((X.shape[1]), b=b, kernel=kernel)(batchn)
 

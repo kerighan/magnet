@@ -29,17 +29,20 @@ cpdef random_step(dict neighbors, list last_step, int num_nodes, float p=.1, flo
                 next_node = random.choice(nn)
         step.append(next_node)
 
-        # append value
-        node_str = str(node)
-        next_node = str(next_node)
-        if is_directed:
-            weight = weights.get(node_str + "_" + next_node, 0)
-            sim.append(weight)
+        # append weight
+        if node == next_node:
+            sim.append(1)
         else:
-            weight = weights.get(
-                node_str + "_" + next_node, 
-                weights.get(next_node + "_" + node_str, 0))
-            sim.append(weight)
+            node_str = str(node)
+            next_node = str(next_node)
+            if is_directed:
+                weight = weights.get(node_str + "_" + next_node, 0)
+                sim.append(weight)
+            else:
+                weight = weights.get(
+                    node_str + "_" + next_node, 
+                    weights.get(next_node + "_" + node_str, 0))
+                sim.append(weight)
     return step, sim
 
 

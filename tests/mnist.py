@@ -13,10 +13,10 @@ mnist = fetch_openml("mnist_784", version=1)
 # data = np.load("datasets/mnist.npy")[:10000]
 
 embedding = magnet.project(
-    mnist.data[:20000], size=2,
-    n_neighbors=15, num_walks=25, kernel="power",
-    batch_size=2000, a=1, b=.33, label_smoothing=False)
-color = mnist.target.astype(int)[:20000]
+    mnist.data[:30000], size=2,
+    n_neighbors=50, num_walks=25, kernel="tanh",
+    batch_size=2000, a=1, b=.3, label_smoothing=False)
+color = mnist.target.astype(int)[:30000]
 
 fig, ax = plt.subplots(figsize=(12, 10))
 plt.scatter(embedding[:, 0], embedding[:, 1], c=color, cmap="Spectral", s=0.1)
