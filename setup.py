@@ -1,9 +1,10 @@
 from distutils.extension import Extension
 from Cython.Build import cythonize
 import setuptools
+import numpy
 
-
-extensions = [Extension("magnet/*", ["magnet/*.pyx"])]
+extensions = [Extension("magnet/*", ["magnet/*.pyx"],
+                        include_dirs=[numpy.get_include()])]
 setuptools.setup(
     name="magnet-learn",
     setup_requires=["cython", "keras", "tqdm", "networkx"],
