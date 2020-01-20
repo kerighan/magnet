@@ -1,5 +1,6 @@
 from .cutils import random_step, generate_walk, compute_similarity, compute_sparse_similarity, compute_graph_similarity
 from multiprocessing import JoinableQueue, Process, Queue
+from .transformation import knn_graph, radius_graph
 import networkx as nx
 from tqdm import tqdm
 import numpy as np
@@ -19,6 +20,8 @@ def fit_transform(
     b=0.5,
     p=0.1,
     q=0.1,
+    min_dist=0,
+    max_dist=1.,
     kernel='power',
     label_smoothing=True,
     init=None,
@@ -26,7 +29,7 @@ def fit_transform(
     epochs=5,
     batch_size=100,
     n_jobs=4,
-    optimizer="adamax",
+    optimizer="nadam"
 ):
     """
     Transforms a graph into a numpy matrix containing embedding of vertices,
@@ -60,7 +63,9 @@ def fit_transform(
         p=p, q=q, sparse=sparse, n_jobs=n_jobs)
 
     if label_smoothing:
-        Y = np.clip(Y, 1e-6, 0.99)
+        min_sim, max_sim = get_clip(min_dist, max_dist, kernel, a, b)
+        print(min_sim, max_sim)
+        Y = np.clip(Y, min_sim, max_sim)
 
     if init == 'spectral':
         Z = spectral_embedding(G, size)
@@ -94,14 +99,19 @@ def project(
     p=0.1, q=0.1,
     kernel='power',
     label_smoothing=True,
+    method="knn",
     init=None,
     sparse=True,
     epochs=5,
     batch_size=200,
     n_jobs=4
 ):
-    G = knn_graph(X, k=n_neighbors, metric=metric,
-                  threshold=threshold, weighted=weighted)
+    if method == "knn":
+        G = knn_graph(X, k=n_neighbors, metric=metric,
+                      threshold=threshold, weighted=weighted)
+    elif method == "radius":
+        G = radius_graph(X, metric=metric, threshold=threshold)
+
     return fit_transform(
         G,
         size,
@@ -267,69 +277,6 @@ def compute_weights(G, node2id):
 # Utils
 # -----
 
-def knn_graph(X, k=10, metric='euclidean', threshold=None, weighted=True):
-    """
-    Creates a k nearest-neighbor graph from cloud points.
-
-    :param X: Points in a numpy array of size (N_samples, N_features)
-    :param k: Max number of nearest neighbors include in the graph
-    :param metric: Distance function used in the pairwise distance
-    :param threshold: If not `None`, this parameter between 0 and 1
-                      is used to avoid adding edges to distances above
-                      the `threshold` percentile (expressed in ratio).
-                      e.g.: if threshold = 0.1, it means that no
-                      edge will be created if the distance between two
-                      nodes is higher than the 10% smallest distinct
-                      pairwise distances.
-    :param weighted: If `True`, the graph is weighted by the scaled inverse 
-                     quantile value of the distance between two nodes.
-                     Scaled because the value is compared to :param threshold:
-                     and its value does not exceed 1
-    """
-    from sklearn.metrics import pairwise_distances
-    N = X.shape[0]
-    dist = pairwise_distances(X, metric=metric)
-    neighbors = np.argsort(dist, axis=1)[:, 1:k + 1]
-    if weighted:
-        from .cutils import weighted_edges_from_neighbors
-        dist_flatten = np.sort(dist.flatten())[N - 1:]
-        percentile = percentile_function(dist_flatten)
-        threshold = 1 if threshold is None else threshold
-        G = nx.Graph()
-        G.add_nodes_from(range(N))
-        edges = weighted_edges_from_neighbors(neighbors, N, dist, percentile, threshold)
-        G.add_weighted_edges_from(edges)
-        print(f"[*] KNN Graph - {len(edges)} edges")
-        return G
-    elif threshold is not None:
-        from .cutils import edges_from_neighbors_threshold
-        dist_flatten = np.sort(dist.flatten())
-        index = min(N + int(threshold * (N * N)), N * N - 1)
-        percentile = dist_flatten[index]
-        G = nx.Graph()
-        G.add_nodes_from(range(N))
-        edges = edges_from_neighbors_threshold(neighbors, N, dist, percentile)
-        G.add_edges_from(edges)
-        print(f"[*] KNN Graph - {len(edges)} edges")
-        return G
-    else:
-        from .cutils import edges_from_neighbors
-        G = nx.Graph()
-        G.add_nodes_from(range(N))
-        edges = edges_from_neighbors(neighbors, N)
-        G.add_edges_from(edges)
-        print(f"[*] KNN Graph - {len(edges)} edges")
-        return G
-
-
-def percentile_function(dist_flatten):
-    """Creates an interpolated percentile function from an array of values."""
-    from scipy.interpolate import interp1d
-    y = np.arange(dist_flatten.shape[0]) / dist_flatten.shape[0]
-    f = interp1d(dist_flatten, y)
-    return f
-
-
 def wordvectors_from(G, Z):
     """Ignore (used in a proprietary NLP package.)"""
     from convectors.models import WordVectors
@@ -353,3 +300,16 @@ def spectral_embedding(G, size=2):
     elapsed_time = time.time() - start_time
     print(f"spectral embedding - T={elapsed_time:.2f}s")
     return Z
+
+
+def get_clip(min_dist, max_dist, kernel, a, b):
+    if kernel == "power":
+        min_sim = 1 / (1 + a * max_dist**b)
+        max_sim = 1 / (1 + a * min_dist**b)
+    elif kernel == "tanh":
+        min_sim = 1 - np.arctanh(a * max_dist**b)
+        max_sim = 1 - np.arctanh(a * min_dist**b)
+    elif kernel == "gaussian":
+        min_sim = np.exp(-a * max_dist**b)
+        max_sim = np.exp(-a * min_dist**b)
+    return min_sim, max_sim

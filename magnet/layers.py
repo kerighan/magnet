@@ -8,27 +8,38 @@ class DistanceSum(Layer):
         self.a = a
         self.b = b
         if kernel == 'power':
-            self.kernel = 0
+            self.kernel = self.power_kernel
         elif kernel == 'gaussian':
-            self.kernel = 1
+            self.kernel = self.gaussian_kernel
+        elif kernel == "sigmoid":
+            self.kernel = self.sigmoid_kernel
+        elif kernel == "tanh":
+            self.kernel = self.tanh_kernel
         else:
-            self.kernel = 2
+            raise ValueError(f"Kernel not found: {kernel}")
         super(DistanceSum, self).__init__(**kwargs)
+
+    def power_kernel(self, distance, a):
+        return K.pow(1 + self.a * distance, -1)
+
+    def tanh_kernel(self, distance, a):
+        return 1 - K.tanh(self.a * distance)
+
+    def gaussian_kernel(self, distance, a):
+        return K.exp(-self.a * distance)
+
+    def sigmoid_kernel(self, distance, a):
+        return 1 / (1 + K.exp(-a * distance - 3))
 
     def build(self, input_shape):
         super(DistanceSum, self).build(input_shape)
 
     def call(self, x):
+        # delta = K.square(x[:, 1:self.walk_len] - x[:, 0:self.walk_len - 1])
+        # distance = (K.sum(delta, axis=2, keepdims=False) + 1e-12) ** self.b
         delta = K.square(x[:, 1:self.walk_len] - x[:, 0:self.walk_len - 1])
         distance = (K.sum(delta, axis=2, keepdims=False) + 1e-12) ** self.b
-        if self.kernel == 0:
-            return K.pow(1 + self.a * distance, -1)
-        elif self.kernel == 1:
-            return K.exp(-self.a * distance)
-        else:
-            sim_g = K.exp(-self.a * distance)
-            sim_p = K.pow(1 + self.a * distance, -1)
-            return sim_g * sim_p
+        return self.kernel(distance, self.a)
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1] - 1)
@@ -72,7 +83,7 @@ class LearnDistanceSum(Layer):
         elif self.kernel == 2:
             return 1 / (1 + K.exp(-a * distance - 3))
         elif self.kernel == 3:
-            return 1 - K.tanh(- a * distance)
+            return 1 - K.tanh(a * distance)
         else:
             sim_g = K.exp(-a * distance)
             sim_p = K.pow(1 + a * distance, -1)
