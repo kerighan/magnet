@@ -1,4 +1,4 @@
-from .cutils import random_step, generate_walk, compute_similarity, compute_sparse_similarity, compute_graph_similarity
+from .cutils import random_step, generate_walk
 from multiprocessing import JoinableQueue, Process, Queue
 from .transformation import knn_graph, radius_graph
 import networkx as nx
@@ -6,126 +6,101 @@ from tqdm import tqdm
 import numpy as np
 import time
 
+
 # ----------------------------------------------
 # Manifold learning and dimensionality reduction
 # ----------------------------------------------
 
+class MAGNET(object):
+    def __init__(
+        self,
+        size=2,
+        a=1, b=.5,
+        min_dist=0, max_dist=1,
+        kernel="power",
+        p=.1, q=.1,
+        num_walks=50, walk_len=50,
+    ):
+        """
+        :param size: Dimension of the embedding
+        :param a: Parameter that controls some tightness of the resulting
+                  manifold. The higher, the tighter
+        :param b: Parameter that controls some tightness of the resulting
+                  manifold. The lower, the tighter
+        :param kernel: Similarity kernel to use. Can be `power`,
+                    `gaussian` or `both`. Recommended is `power`
+        :param p: Probability in a random walk to jump to a random node
+        :param q: Probability to jump back to the starting node
+        :param num_walks: Number of random walks starting from each node
+        :param walk_len: Length of the random walks
+        """
+        # manifold-related parameters
+        self.size = size
+        self.a = a
+        self.b = b
+        self.min_dist = min_dist
+        self.max_dist = max_dist
+        self.kernel = kernel
+        # graph-related parameters
+        self.p = p
+        self.q = q
+        self.num_walks = num_walks
+        self.walk_len = walk_len
 
-def fit_transform(
-    G,
-    size=2,
-    num_walks=25,
-    walk_len=50,
-    a=1,
-    b=0.5,
-    p=0.1,
-    q=0.1,
-    min_dist=0,
-    max_dist=1.,
-    kernel='power',
-    label_smoothing=True,
-    init=None,
-    sparse=True,
-    epochs=5,
-    batch_size=100,
-    n_jobs=4,
-    optimizer="nadam"
-):
-    """
-    Transforms a graph into a numpy matrix containing embedding of vertices,
-    sorted in the same order as they appear in when iterating over the nodes.
-
-    :param G: Networx Graph of any type
-    :param size: Dimension of the embedding
-    :param num_walks: Number of random walks starting from each node
-    :param walk_len: Length of the random walks
-    :param a: Parameter that controls some tightness of the resulting manifold
-              The higher, the tighter
-    :param b: Parameter that controls some tightness of the resulting manifold
-              The lower, the tighter
-    :param p: Probability in a random walk to jump to a random node
-    :param q: Probability in a random walk to jump back to the starting node
-    :param kernel: Similarity kernel to use. Can be `power`,
-                   `gaussian` or `both`. Recommended is `power`
-    :param label_smoothing: Boolean. Label smoothing is avoiding certainty
-                            in the training data
-    :param init: Can be `spectral` or a numpy matrix of size (N_nodes, size)
-    :param sparse: Controls sparsity of the graph adjacency matrix
-    :param epochs: Number of epochs
-    :param batch_size: Size of the batch of the SGD
-    :param n_jobs: Number of processes building randomwalks
-    """
-
-    from .model import fit_model
-    X, Y = create_random_walks(
+    def fit_transform(
+        self,
         G,
-        num_walks=num_walks, walk_len=walk_len,
-        p=p, q=q, sparse=sparse, n_jobs=n_jobs)
+        init=None,
+        epochs=5,
+        batch_size=100,
+        optimizer="nadam",
+        n_jobs=4
+    ):
+        from .model import fit_model
 
-    if label_smoothing:
-        min_sim, max_sim = get_clip(min_dist, max_dist, kernel, a, b)
-        print(min_sim, max_sim)
-        Y = np.clip(Y, min_sim, max_sim)
+        # create random walks on graph
+        X, Y = create_random_walks(
+            G,
+            num_walks=self.num_walks,
+            walk_len=self.walk_len,
+            p=self.p, q=self.q,
+            n_jobs=n_jobs)
+        print(f"{len(X)} training samples")
 
-    if init == 'spectral':
-        Z = spectral_embedding(G, size)
-    elif isinstance(init, np.ndarray):
-        Z = init
-    else:
+        # clip training matrix using min_dist and max_dist
+        min_dist = self.min_dist
+        max_dist = self.max_dist
+        if min_dist is not None and max_dist is not None:
+            min_sim, max_sim = get_clip(
+                min_dist, max_dist, self.kernel, self.a, self.b)
+            print(min_sim, max_sim)
+            Y = np.clip(Y, min_sim, max_sim)
+
+        # define the initialization
         Z = None
+        if init == 'spectral':
+            Z = spectral_embedding(G, self.size)
+        elif isinstance(init, np.ndarray):
+            Z = init
 
-    print(f"{len(X)} samples")
-    embeddings = fit_model(
-        X, Y, Z, (len(G.nodes)),
-        a=a, b=b,
-        size=size,
-        kernel=kernel,
-        epochs=epochs,
-        batch_size=batch_size,
-        optimizer=optimizer)
-    return embeddings
+        # train Keras model
+        embeddings = fit_model(
+            X, Y, Z, (len(G.nodes)),
+            a=self.a, b=self.b,
+            size=self.size,
+            kernel=self.kernel,
+            epochs=epochs,
+            batch_size=batch_size,
+            optimizer=optimizer)
+        return embeddings
 
-
-def project(
-    X,
-    size=2,
-    n_neighbors=10,
-    metric="euclidean",
-    threshold=None,
-    weighted=False,
-    num_walks=25,
-    walk_len=40,
-    a=1, b=0.3,
-    p=0.1, q=0.1,
-    kernel='power',
-    label_smoothing=True,
-    method="knn",
-    init=None,
-    sparse=True,
-    epochs=5,
-    batch_size=200,
-    n_jobs=4
-):
-    if method == "knn":
+    def knn_graph(
+        self, X, n_neighbors=10, metric="euclidean",
+        threshold=None, weighted=False
+    ):
         G = knn_graph(X, k=n_neighbors, metric=metric,
                       threshold=threshold, weighted=weighted)
-    elif method == "radius":
-        G = radius_graph(X, metric=metric, threshold=threshold)
-
-    return fit_transform(
-        G,
-        size,
-        num_walks,
-        walk_len,
-        a, b,
-        p, q,
-        kernel,
-        label_smoothing,
-        init,
-        sparse,
-        epochs,
-        batch_size,
-        n_jobs)
+        return G
 
 
 # ------------
@@ -135,8 +110,7 @@ def project(
 def create_random_walks(
     G, num_walks=25, walk_len=100,
     p=0.1, q=0.1,
-    n_jobs=8,
-    sparse=True
+    n_jobs=8
 ):
     """
     Creates random walks on the graph `G`.
@@ -303,12 +277,13 @@ def spectral_embedding(G, size=2):
 
 
 def get_clip(min_dist, max_dist, kernel, a, b):
+    print(min_dist, max_dist, kernel, a, b)
     if kernel == "power":
         min_sim = 1 / (1 + a * max_dist**b)
         max_sim = 1 / (1 + a * min_dist**b)
     elif kernel == "tanh":
-        min_sim = 1 - np.arctanh(a * max_dist**b)
-        max_sim = 1 - np.arctanh(a * min_dist**b)
+        min_sim = 1 - np.tanh(a * max_dist**b)
+        max_sim = 1 - np.tanh(a * min_dist**b)
     elif kernel == "gaussian":
         min_sim = np.exp(-a * max_dist**b)
         max_sim = np.exp(-a * min_dist**b)

@@ -35,15 +35,15 @@ class DistanceSum(Layer):
         super(DistanceSum, self).build(input_shape)
 
     def call(self, x):
-        # delta = K.square(x[:, 1:self.walk_len] - x[:, 0:self.walk_len - 1])
-        # distance = (K.sum(delta, axis=2, keepdims=False) + 1e-12) ** self.b
         delta = K.square(x[:, 1:self.walk_len] - x[:, 0:self.walk_len - 1])
-        distance = (K.sum(delta, axis=2, keepdims=False) + 1e-12) ** self.b
+        distance = (K.sum(delta, axis=2, keepdims=False) + 1e-30) ** self.b
         return self.kernel(distance, self.a)
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1] - 1)
 
+
+# Depecrated
 
 class LearnDistanceSum(Layer):
     def __init__(self, walk_len, b=1, kernel='power', **kwargs):
