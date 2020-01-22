@@ -20,6 +20,8 @@ class MAGNET(object):
         kernel="power",
         p=.1, q=.1,
         num_walks=50, walk_len=50,
+        optimizer="nadam",
+        loss="mse"
     ):
         """
         :param size: Dimension of the embedding
@@ -46,6 +48,9 @@ class MAGNET(object):
         self.q = q
         self.num_walks = num_walks
         self.walk_len = walk_len
+        # keras model parameters
+        self.optimizer = optimizer
+        self.loss = loss
 
     def fit_transform(
         self,
@@ -53,7 +58,6 @@ class MAGNET(object):
         init=None,
         epochs=5,
         batch_size=100,
-        optimizer="nadam",
         n_jobs=4
     ):
         from .model import fit_model
@@ -91,7 +95,8 @@ class MAGNET(object):
             kernel=self.kernel,
             epochs=epochs,
             batch_size=batch_size,
-            optimizer=optimizer)
+            optimizer=self.optimizer,
+            loss=self.loss)
         return embeddings
 
     def knn_graph(
