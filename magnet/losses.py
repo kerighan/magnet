@@ -1,8 +1,11 @@
 from keras import backend as K
 
 
-def get_loss(kernel, loss):
-    if kernel == "power":
+def get_loss(kernel, loss, local):
+    if local:
+        def loss_func(x, y):
+            return x - y
+    elif kernel == "power":
         loss_func = power_loss
     elif kernel == "tanh":
         loss_func = tanh_loss

@@ -14,7 +14,8 @@ def fit_model(
     kernel='power',
     epochs=50, batch_size=100,
     optimizer='adamax',
-    loss="mse"
+    loss="mse",
+    local=False
 ):
     inp = Input(shape=(X.shape[1],))
     if Z is not None:
@@ -31,7 +32,7 @@ def fit_model(
         distance = LearnDistanceSum((X.shape[1]), b=b, kernel=kernel)(batchn)
 
     model = Model(inp, distance)
-    model.compile(optimizer, get_loss(kernel, loss))
+    model.compile(optimizer, get_loss(kernel, loss, local))
     model.fit(X, Y, epochs=epochs, batch_size=batch_size)
 
     Z = model.layers[1].get_weights()[0]

@@ -92,3 +92,24 @@ def percentile_function(dist_flatten):
     y = np.arange(dist_flatten.shape[0]) / dist_flatten.shape[0]
     f = interp1d(dist_flatten, y)
     return f
+
+
+def similarity_graph(X, metric="euclidean"):
+    from sklearn.metrics import pairwise_distances
+
+    N = X.shape[0]
+
+    # compute pairwise distances and get nearest neighbors
+    dist = pairwise_distances(X, metric=metric)
+    min_dist = np.min(dist[np.nonzero(dist)])
+    max_dist = np.max(dist[np.nonzero(dist)])
+
+    edges = []
+    for i in range(N):
+        for j in range(i):
+            weight = 1 - (dist[i, j] - min_dist) / max_dist
+            edges.append((i, j, weight))
+    G = nx.Graph()
+    G.add_nodes_from(range(N))
+    G.add_weighted_edges_from(edges)
+    return G

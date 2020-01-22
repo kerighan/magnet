@@ -1,6 +1,6 @@
 from .cutils import random_step, generate_walk
 from multiprocessing import JoinableQueue, Process, Queue
-from .transformation import knn_graph, radius_graph
+from .transformation import knn_graph, radius_graph, similarity_graph, radius_graph
 import networkx as nx
 from tqdm import tqdm
 import numpy as np
@@ -21,7 +21,8 @@ class MAGNET(object):
         p=.1, q=.1,
         num_walks=50, walk_len=50,
         optimizer="nadam",
-        loss="mse"
+        loss="mse",
+        local=False
     ):
         """
         :param size: Dimension of the embedding
@@ -51,6 +52,7 @@ class MAGNET(object):
         # keras model parameters
         self.optimizer = optimizer
         self.loss = loss
+        self.local = local
 
     def fit_transform(
         self,
@@ -96,7 +98,8 @@ class MAGNET(object):
             epochs=epochs,
             batch_size=batch_size,
             optimizer=self.optimizer,
-            loss=self.loss)
+            loss=self.loss,
+            local=self.local)
         return embeddings
 
     def knn_graph(
@@ -105,6 +108,14 @@ class MAGNET(object):
     ):
         G = knn_graph(X, k=n_neighbors, metric=metric,
                       threshold=threshold, weighted=weighted)
+        return G
+
+    def similarity_graph(self, X, metric="euclidean"):
+        G = similarity_graph(X)
+        return G
+
+    def radius_graph(self, X, metric="euclidean", threshold=.1):
+        G = radius_graph(X)
         return G
 
 
