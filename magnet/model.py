@@ -3,6 +3,7 @@ from keras.models import Model
 from .layers import (
     DistanceSum, LearnDistanceSum, LearnBDistanceSum)
 from .losses import get_loss
+import numpy as np
 from tqdm import tqdm
 
 
@@ -15,8 +16,11 @@ def fit_model(
     epochs=50, batch_size=100,
     optimizer='adamax',
     loss="mse",
-    local=False
+    local=False,
+    seed=1
 ):
+    np.random.seed(seed)
+
     inp = Input(shape=(X.shape[1],))
     if Z is not None:
         embedding = Embedding(num_nodes, size, weights=[Z])(inp)
@@ -34,6 +38,8 @@ def fit_model(
     model = Model(inp, distance)
     model.compile(optimizer, get_loss(kernel, loss, local))
     model.fit(X, Y, epochs=epochs, batch_size=batch_size)
+
+    print(model.layers[-1].get_weights())
 
     Z = model.layers[1].get_weights()[0]
     return Z
