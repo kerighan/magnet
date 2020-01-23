@@ -293,7 +293,9 @@ def spectral_embedding(G, size=2):
 
 
 def get_clip(min_dist, max_dist, kernel, a, b):
-    print(min_dist, max_dist, kernel, a, b)
+    if a is None:
+        a = 1.
+    # print(min_dist, max_dist, kernel, a, b)
     if kernel == "power":
         min_sim = 1 / (1 + a * max_dist**b)
         max_sim = 1 / (1 + a * min_dist**b)
