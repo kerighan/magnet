@@ -5,7 +5,7 @@ import networkx as nx
 from annoy import AnnoyIndex
 
 
-def knn_graph(X, k=10, metric='euclidean', n_trees=20):
+def knn_graph(X, k=10, metric='euclidean', n_trees=20, directed=False):
     """
     Creates a k nearest-neighbor graph from cloud points.
 
@@ -32,13 +32,17 @@ def knn_graph(X, k=10, metric='euclidean', n_trees=20):
             if i != neighbor:
                 edges.append((i, neighbor))
 
-    G = nx.Graph()
+    if directed:
+        G = nx.DiGraph()
+    else:
+        G = nx.Graph()
     G.add_nodes_from(range(N))
     G.add_edges_from(edges)
 
     elapsed = time.time() - start
     print(f"KNN Graph - {len(edges)} edges - T={elapsed:.2f}")
     return G
+
 
 def radius_graph(X, metric='euclidean', threshold=.1):
     from scipy.spatial.distance import pdist, squareform
