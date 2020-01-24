@@ -1,22 +1,35 @@
-from sklearn.datasets import fetch_openml
+# from sklearn.datasets import fetch_openml
 import matplotlib.pyplot as plt
+
+from annoy import AnnoyIndex
+
 import seaborn as sns
 import numpy as np
 import magnet
+import time
 
 sns.set(context="paper", style="white")
 
-mnist = fetch_openml("mnist_784", version=1)
-# print(mnist.data)
+# mnist = fetch_openml("mnist_784", version=1)
+# np.save("datasets/mnist_data.npy", mnist.data)
+# color = mnist.target.astype(int)
+# np.save("datasets/mnist_color.npy", color)
 
-# np.save("datasets/mnist.npy", mnist.data)
-# data = np.load("datasets/mnist.npy")[:10000]
+N = 70000
+data = np.load("datasets/mnist_data.npy")[:N]
+color = np.load("datasets/mnist_color.npy")[:N]
 
-reducer = magnet.MAGNET()
-G = reducer.knn_graph(mnist.data)
-embedding = reducer.fit_transform(G)
+start = time.time()
+reducer = magnet.MAGNET(
+    a=None, b=.3, max_dist=100,
+    kernel="tanh", num_walks=100, walk_len=50,
+    p=0.01, q=0.01)
+G = reducer.knn_graph(data, n_neighbors=10, n_trees=10)
+embedding = reducer.fit_transform(
+    G, epochs=1, batch_size=250, n_jobs=8, init="spectral")
 
-color = mnist.target.astype(int)[:30000]
+elapsed = time.time() - start
+print(elapsed)
 
 fig, ax = plt.subplots(figsize=(12, 10))
 plt.scatter(embedding[:, 0], embedding[:, 1], c=color, cmap="Spectral", s=0.1)

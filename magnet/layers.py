@@ -2,8 +2,24 @@ from keras.layers import Layer
 from keras import backend as K
 
 
+def get_distance_layer(kernel, batchn, walk_len, a, b, seed):
+    if a is not None and b is not None:
+        distance = DistanceSum(walk_len, a=a, b=b, kernel=kernel)
+    elif b is None:
+        distance = LearnBDistanceSum(walk_len, a=a, kernel=kernel)
+    else:
+        distance = LearnDistanceSum(walk_len, b=b, kernel=kernel)
+    return distance(batchn)
+
+
 class DistanceSum(Layer):
-    def __init__(self, walk_len, a=1, b=1, kernel='power', **kwargs):
+    def __init__(
+        self,
+        walk_len,
+        a=1, b=1,
+        kernel='power',
+        **kwargs
+    ):
         self.walk_len = walk_len
         self.a = a
         self.b = b

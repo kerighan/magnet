@@ -15,9 +15,9 @@ class MAGNET(object):
     def __init__(
         self,
         size=2,
-        a=1, b=.5,
+        a=None, b=.33,
         min_dist=0, max_dist=1,
-        kernel="power",
+        kernel="tanh",
         p=.1, q=.1,
         num_walks=50, walk_len=50,
         optimizer="nadam",
@@ -60,7 +60,8 @@ class MAGNET(object):
         init=None,
         epochs=5,
         batch_size=100,
-        n_jobs=4
+        n_jobs=4,
+        seed=1
     ):
         from .model import fit_model
 
@@ -99,15 +100,12 @@ class MAGNET(object):
             batch_size=batch_size,
             optimizer=self.optimizer,
             loss=self.loss,
-            local=self.local)
+            local=self.local,
+            seed=seed)
         return embeddings
 
-    def knn_graph(
-        self, X, n_neighbors=10, metric="euclidean",
-        threshold=None, weighted=False
-    ):
-        G = knn_graph(X, k=n_neighbors, metric=metric,
-                      threshold=threshold, weighted=weighted)
+    def knn_graph(self, X, n_neighbors=10, metric="euclidean", n_trees=20):
+        G = knn_graph(X, k=n_neighbors, metric=metric, n_trees=n_trees)
         return G
 
     def similarity_graph(self, X, metric="euclidean"):

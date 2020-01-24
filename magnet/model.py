@@ -1,10 +1,14 @@
 from keras.layers import Input, Embedding, Dense, BatchNormalization
 from keras.models import Model
-from .layers import (
-    DistanceSum, LearnDistanceSum, LearnBDistanceSum)
+from keras.initializers import lecun_normal
+from .layers import get_distance_layer
 from .losses import get_loss
-import numpy as np
+import tensorflow as tf
 from tqdm import tqdm
+import numpy as np
+
+
+tf.get_logger().setLevel('INFO')
 
 
 def fit_model(
@@ -19,27 +23,25 @@ def fit_model(
     local=False,
     seed=1
 ):
-    np.random.seed(seed)
+    walk_len = X.shape[1]
 
-    inp = Input(shape=(X.shape[1],))
+    # layer specification
+    inp = Input(shape=(walk_len,))
     if Z is not None:
         embedding = Embedding(num_nodes, size, weights=[Z])(inp)
     else:
-        embedding = Embedding(num_nodes, size,
-                              embeddings_initializer="he_normal")(inp)
+        embedding = Embedding(
+            num_nodes, size,
+            embeddings_initializer=lecun_normal(seed))(inp)
     batchn = BatchNormalization()(embedding)
-    if a is not None and b is not None:
-        distance = DistanceSum((X.shape[1]), a=a, b=b, kernel=kernel)(batchn)
-    elif b is None:
-        distance = LearnBDistanceSum((X.shape[1]), a=a, kernel=kernel)(batchn)
-    else:
-        distance = LearnDistanceSum((X.shape[1]), b=b, kernel=kernel)(batchn)
+    distance = get_distance_layer(kernel, batchn, walk_len, a, b, seed)
 
+    # build and compile model
     model = Model(inp, distance)
     model.compile(optimizer, get_loss(kernel, loss, local))
     model.fit(X, Y, epochs=epochs, batch_size=batch_size)
 
-    print(model.layers[-1].get_weights())
+    print(model.layers[-1].get_weights()[0][0])
 
     Z = model.layers[1].get_weights()[0]
     return Z
