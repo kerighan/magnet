@@ -20,6 +20,7 @@ class DistanceSum(Layer):
         kernel='power',
         **kwargs
     ):
+        print("go here")
         self.walk_len = walk_len
         self.a = a
         self.b = b
@@ -53,7 +54,8 @@ class DistanceSum(Layer):
     def call(self, x):
         delta = K.square(x[:, 1:self.walk_len] - x[:, 0:self.walk_len - 1])
         distance = (K.sum(delta, axis=2, keepdims=False) + 1e-30) ** self.b
-        return self.kernel(distance, self.a)
+        # return self.kernel(distance, self.a)
+        return distance
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1] - 1)
@@ -101,8 +103,9 @@ class LearnDistanceSum(Layer):
     def call(self, x):
         a = 1 / (1 + K.exp(-self.W[0]))
         delta = K.square(x[:, 1:self.walk_len] - x[:, 0:self.walk_len - 1])
-        distance = (K.sum(delta, axis=2, keepdims=False) + 1e-12) ** self.b
-        return self.kernel(distance, a)
+        distance = (K.sum(delta, axis=2, keepdims=False) + 1e-30) ** self.b
+        # return self.kernel(distance, a)
+        return a * distance
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1] - 1)

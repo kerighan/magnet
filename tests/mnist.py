@@ -21,12 +21,13 @@ color = np.load("datasets/mnist_color.npy")[:N]
 
 start = time.time()
 reducer = magnet.MAGNET(
-    a=None, b=.3, max_dist=100,
-    kernel="tanh", num_walks=100, walk_len=50,
-    p=0.01, q=0.01)
-G = reducer.knn_graph(data, n_neighbors=10, n_trees=10)
+    a=None, b=.3, max_dist=6,
+    kernel="tanh", num_walks=25, walk_len=50,
+    loss="logcosh",
+    p=0.05, q=0.05)
+G = reducer.knn_graph(data, n_neighbors=10, n_trees=5, directed=False)
 embedding = reducer.fit_transform(
-    G, epochs=1, batch_size=250, n_jobs=8, init="spectral")
+    G, epochs=2, batch_size=250, n_jobs=8, init=None)
 
 elapsed = time.time() - start
 print(elapsed)

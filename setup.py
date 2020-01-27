@@ -8,6 +8,7 @@ extensions = [Extension("magnet/*", ["magnet/*.pyx"],
 setuptools.setup(
     name="magnet-learn",
     setup_requires=["cython", "keras", "tqdm", "networkx"],
+    install_requires=["cython", "keras", "tqdm", "networkx"],
     ext_modules=cythonize(extensions),
     version="0.0.1",
     author="Maixent Chenebaux",

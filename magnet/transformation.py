@@ -26,21 +26,22 @@ def knn_graph(X, k=10, metric='euclidean', n_trees=20, directed=False):
         index.add_item(i, X[i])
     index.build(n_trees)
 
-    edges = []
-    for i in range(N):
-        for neighbor in index.get_nns_by_item(i, k):
-            if i != neighbor:
-                edges.append((i, neighbor))
-
     if directed:
         G = nx.DiGraph()
     else:
         G = nx.Graph()
+    # edges = []
     G.add_nodes_from(range(N))
-    G.add_edges_from(edges)
+    for i in range(N):
+        for neighbor in index.get_nns_by_item(i, k):
+            if i != neighbor:
+                # edges.append((i, neighbor))
+                G.add_edge(i, neighbor)
+
+    # G.add_edges_from(edges)
 
     elapsed = time.time() - start
-    print(f"KNN Graph - {len(edges)} edges - T={elapsed:.2f}")
+    print(f"KNN Graph - T={elapsed:.2f}")
     return G
 
 

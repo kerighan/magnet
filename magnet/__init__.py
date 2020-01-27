@@ -1,4 +1,4 @@
-from .cutils import random_step, generate_walk
+from .cutils import generate_walk
 from multiprocessing import JoinableQueue, Process, Queue
 from .transformation import knn_graph, radius_graph, similarity_graph, radius_graph
 import networkx as nx
@@ -66,22 +66,19 @@ class MAGNET(object):
         from .model import fit_model
 
         # create random walks on graph
-        X, Y = create_random_walks(
-            G,
-            num_walks=self.num_walks,
-            walk_len=self.walk_len,
-            p=self.p, q=self.q,
-            n_jobs=n_jobs)
+        X, Y = self.create_random_walks(G, n_jobs=n_jobs)
         print(f"{len(X)} training samples")
 
         # clip training matrix using min_dist and max_dist
-        min_dist = self.min_dist
-        max_dist = self.max_dist
-        if min_dist is not None and max_dist is not None:
-            min_sim, max_sim = get_clip(
-                min_dist, max_dist, self.kernel, self.a, self.b)
-            print(min_sim, max_sim)
-            Y = np.clip(Y, min_sim, max_sim)
+        # min_dist = self.min_dist
+        # max_dist = self.max_dist
+        # if min_dist is not None and max_dist is not None:
+        #     min_sim, max_sim = get_clip(
+        #         min_dist, max_dist, self.kernel, self.a, self.b)
+        #     print(min_sim, max_sim)
+        #     Y = np.clip(Y, min_sim, max_sim)
+        print(Y)
+        print(Y.max())
 
         # define the initialization
         Z = None
@@ -104,8 +101,8 @@ class MAGNET(object):
             seed=seed)
         return embeddings
 
-    def knn_graph(self, X, n_neighbors=10, metric="euclidean", n_trees=20):
-        G = knn_graph(X, k=n_neighbors, metric=metric, n_trees=n_trees)
+    def knn_graph(self, X, n_neighbors=10, metric="euclidean", n_trees=20, directed=False):
+        G = knn_graph(X, k=n_neighbors, metric=metric, n_trees=n_trees, directed=False)
         return G
 
     def similarity_graph(self, X, metric="euclidean"):
@@ -116,36 +113,61 @@ class MAGNET(object):
         G = radius_graph(X)
         return G
 
+    # ------------
+    # Random walks
+    # ------------
 
-# ------------
-# Random walks
-# ------------
+    def create_random_walks(
+        self, G, n_jobs=8
+    ):
+        """
+        Creates random walks on the graph `G`.
+        """
+        num_nodes = len(G.nodes)
+        id2node = list(G.nodes)
+        node2id = {k: v for v, k in enumerate(id2node)}
+        neighbors = {
+            node2id[node]: [node2id[target] for target in G.neighbors(node)]
+            for node in node2id}
 
-def create_random_walks(
-    G, num_walks=25, walk_len=100,
-    p=0.1, q=0.1,
-    n_jobs=8
-):
-    """
-    Creates random walks on the graph `G`.
-    """
-    num_nodes = len(G.nodes)
-    id2node = list(G.nodes)
-    node2id = {k: v for v, k in enumerate(id2node)}
-    neighbors = {node2id[node]:
-                 [node2id[target] for target in G.neighbors(node)]
-                 for node in node2id}
+        # compute weights (or rather distances already)
+        weights = self.compute_weights(G, node2id)
 
-    if n_jobs == 1:
-        walks = one_job_walks(num_walks, walk_len, num_nodes,
-                              neighbors, p, q)
-    else:
-        walks, similarity = parallel_walks(
-            G, node2id, num_walks, walk_len,
-            neighbors, num_nodes, p, q,
-            n_jobs)
+        if n_jobs == 1:
+            walks = one_job_walks(
+                self.num_walks, self.walk_len, num_nodes,
+                neighbors, self.p, self.q)
+        else:
+            walks, similarity = parallel_walks(
+                G, node2id,
+                self.num_walks, self.walk_len,
+                neighbors, self.min_dist, self.max_dist, num_nodes,
+                self.p, self.q, weights,
+                n_jobs)
+        return (walks, similarity)
 
-    return (walks, similarity)
+    def compute_weights(self, G, node2id, as_distance=True):
+        start_time = time.time()
+        is_weighted = nx.is_weighted(G)
+
+        weights = {}
+        for a, b in G.edges:
+            node_a = str(node2id[a])
+            node_b = str(node2id[b])
+
+            if is_weighted:
+                weight = G[a][b]["weight"]
+            else:
+                weight = 1
+
+            if as_distance:
+                weight = (1 - weight) * self.max_dist + weight * self.min_dist
+
+            weights[node_a + "_" + node_b] = weight
+
+        elapsed_time = time.time() - start_time
+        print(f"weights loaded - T={elapsed_time:.2f}s")
+        return weights
 
 
 def process_walks(
@@ -154,6 +176,7 @@ def process_walks(
     walk_len,
     num_nodes,
     neighbors,
+    min_dist, max_dist,
     p, q,
     weights,
     is_directed,
@@ -167,6 +190,7 @@ def process_walks(
         steps, sim = generate_walk(
             walk_len, num_nodes,
             neighbors,
+            min_dist, max_dist,
             p, q,
             weights,
             is_directed)
@@ -181,11 +205,12 @@ def parallel_walks(
     num_walks,
     walk_len,
     neighbors,
+    min_dist, max_dist,
     num_nodes,
     p, q,
+    weights,
     n_jobs
 ):
-    weights = compute_weights(G, node2id)
     is_directed = nx.is_directed(G)
 
     start_time = time.time()
@@ -196,7 +221,8 @@ def parallel_walks(
 
     for i in range(n_jobs):
         args = (queue, results, walk_len, num_nodes,
-                neighbors, p, q, weights, is_directed)
+                neighbors, min_dist, max_dist,
+                p, q, weights, is_directed)
         thread = Process(target=process_walks, args=args)
         thread.daemon = True
         thread.start()
@@ -238,27 +264,6 @@ def one_job_walks(
 
     walks = np.vstack(walks)
     return walks
-
-
-def compute_weights(G, node2id):
-    start_time = time.time()
-    is_weighted = nx.is_weighted(G)
-
-    weights = {}
-    for a, b in G.edges:
-        node_a = str(node2id[a])
-        node_b = str(node2id[b])
-
-        if is_weighted:
-            weight = G[a][b]["weight"]
-        else:
-            weight = 1
-
-        weights[node_a + "_" + node_b] = weight
-
-    elapsed_time = time.time() - start_time
-    print(f"weights loaded - T={elapsed_time:.2f}s")
-    return weights
 
 
 # -----
