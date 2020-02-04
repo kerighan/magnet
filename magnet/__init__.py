@@ -21,8 +21,7 @@ class MAGNET(object):
         p=.1, q=.1,
         num_walks=50, walk_len=50,
         optimizer="nadam",
-        loss="mse",
-        local=False
+        loss="mse"
     ):
         """
         :param size: Dimension of the embedding
@@ -52,7 +51,6 @@ class MAGNET(object):
         # keras model parameters
         self.optimizer = optimizer
         self.loss = loss
-        self.local = local
 
     def fit_transform(
         self,
@@ -68,17 +66,6 @@ class MAGNET(object):
         # create random walks on graph
         X, Y = self.create_random_walks(G, n_jobs=n_jobs)
         print(f"{len(X)} training samples")
-
-        # clip training matrix using min_dist and max_dist
-        # min_dist = self.min_dist
-        # max_dist = self.max_dist
-        # if min_dist is not None and max_dist is not None:
-        #     min_sim, max_sim = get_clip(
-        #         min_dist, max_dist, self.kernel, self.a, self.b)
-        #     print(min_sim, max_sim)
-        #     Y = np.clip(Y, min_sim, max_sim)
-        print(Y)
-        print(Y.max())
 
         # define the initialization
         Z = None
@@ -97,12 +84,21 @@ class MAGNET(object):
             batch_size=batch_size,
             optimizer=self.optimizer,
             loss=self.loss,
-            local=self.local,
             seed=seed)
         return embeddings
 
-    def knn_graph(self, X, n_neighbors=10, metric="euclidean", n_trees=20, directed=False):
-        G = knn_graph(X, k=n_neighbors, metric=metric, n_trees=n_trees, directed=False)
+    def knn_graph(
+        self, X,
+        n_neighbors=10,
+        metric="euclidean",
+        n_trees=20,
+        directed=False
+    ):
+        G = knn_graph(X,
+                      k=n_neighbors,
+                      metric=metric,
+                      n_trees=n_trees,
+                      directed=False)
         return G
 
     def similarity_graph(self, X, metric="euclidean"):

@@ -20,7 +20,6 @@ def fit_model(
     epochs=50, batch_size=100,
     optimizer='adamax',
     loss="mse",
-    local=True,
     seed=1
 ):
     walk_len = X.shape[1]
@@ -38,12 +37,8 @@ def fit_model(
 
     # build and compile model
     model = Model(inp, distance)
-    # model.compile(optimizer, get_loss(kernel, loss, local))
     model.compile(optimizer, loss)
     model.fit(X, Y, epochs=epochs, batch_size=batch_size)
-
-    print(model.layers[-1].get_weights()[0][0])
-    print()
 
     Z = model.layers[1].get_weights()[0]
     return Z
