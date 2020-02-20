@@ -1,15 +1,16 @@
 from .cutils import generate_walk
 from multiprocessing import JoinableQueue, Process, Queue
-from .transformation import knn_graph, radius_graph, similarity_graph, radius_graph
+from .transformation import (
+    knn_graph, similarity_graph, radius_graph)
 import networkx as nx
 from tqdm import tqdm
 import numpy as np
 import time
 
 
-# ----------------------------------------------
+# ==============================================
 # Manifold learning and dimensionality reduction
-# ----------------------------------------------
+# ==============================================
 
 class MAGNET(object):
     def __init__(
