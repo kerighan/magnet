@@ -1,14 +1,3 @@
-from keras.layers import Input, Embedding, Dense, BatchNormalization
-from keras.models import Model
-from keras.initializers import lecun_normal
-from .layers import get_distance_layer
-from .losses import get_loss
-import tensorflow as tf
-from tqdm import tqdm
-import numpy as np
-
-
-tf.get_logger().setLevel('INFO')
 
 
 def fit_model(
@@ -22,6 +11,11 @@ def fit_model(
     loss="mse",
     seed=1
 ):
+    from keras.layers import Input, Embedding, BatchNormalization
+    from keras.models import Model
+    from keras.initializers import lecun_normal
+    from .layers import get_distance_layer
+
     walk_len = X.shape[1]
 
     # layer specification

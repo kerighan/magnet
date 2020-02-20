@@ -21,7 +21,8 @@ class MAGNET(object):
         p=.1, q=.1,
         num_walks=50, walk_len=50,
         optimizer="nadam",
-        loss="mse"
+        loss="mse",
+        method="cpu"
     ):
         """
         :param size: Dimension of the embedding
@@ -51,6 +52,7 @@ class MAGNET(object):
         # keras model parameters
         self.optimizer = optimizer
         self.loss = loss
+        self.method = method
 
     def fit_transform(
         self,
@@ -61,7 +63,6 @@ class MAGNET(object):
         n_jobs=4,
         seed=1
     ):
-        from .model import fit_model
 
         # create random walks on graph
         X, Y = self.create_random_walks(G, n_jobs=n_jobs)
@@ -74,18 +75,36 @@ class MAGNET(object):
         elif isinstance(init, np.ndarray):
             Z = init
 
-        # train Keras model
-        embeddings = fit_model(
-            X, Y, Z, (len(G.nodes)),
-            a=self.a, b=self.b,
-            size=self.size,
-            kernel=self.kernel,
-            epochs=epochs,
-            batch_size=batch_size,
-            optimizer=self.optimizer,
-            loss=self.loss,
-            seed=seed)
-        return embeddings
+        if self.method != "cpu":
+            # train Keras model
+            from .model import fit_model
+            Z = fit_model(
+                X, Y, Z, (len(G.nodes)),
+                a=self.a, b=self.b,
+                size=self.size,
+                kernel=self.kernel,
+                epochs=epochs,
+                batch_size=batch_size,
+                optimizer=self.optimizer,
+                loss=self.loss,
+                seed=seed)
+        else:
+            # train using numpy and numba
+            from .cpu_model import train
+            if Z is None:
+                Z = np.random.normal(
+                    size=(len(G.nodes), self.size)
+                ).astype(np.float32)
+            Y = Y.astype(np.float32)
+            Z = train(
+                X, Y, Z,
+                size=self.size,
+                b=self.b,
+                batch_size=batch_size,
+                epochs=epochs,
+                momentum=.6,
+                learning_rate=1e-2)
+        return Z
 
     def knn_graph(
         self, X,
