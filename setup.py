@@ -1,16 +1,16 @@
-from distutils.extension import Extension
-from Cython.Build import cythonize
 import setuptools
+from Cython.Build import cythonize
+from distutils.extension import Extension
 import numpy
 
-extensions = [Extension("magnet/*", ["magnet/*.pyx"],
+extensions = [Extension("magnet/*", ["magnet/cutils.pyx"],
                         include_dirs=[numpy.get_include()])]
 setuptools.setup(
     name="magnet-learn",
     setup_requires=["cython", "keras", "tqdm", "networkx"],
     install_requires=["cython", "keras", "tqdm", "networkx"],
     ext_modules=cythonize(extensions),
-    version="0.0.1",
+    version="0.0.2",
     author="Maixent Chenebaux",
     author_email="max.chbx@gmail.com",
     description="MAnifold learning form weighted Graphs and NETworks",
